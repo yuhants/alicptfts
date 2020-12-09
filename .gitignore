@@ -1,0 +1,12 @@
+__pyache__/
+*.py[cod]
+*$py.class
+*.py.un
+*.py.un~
+*.py~
+example.py
+
+.gitignore~
+*.un~
+*~
+
