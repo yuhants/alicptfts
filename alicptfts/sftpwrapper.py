@@ -20,13 +20,11 @@ class SFTPWrapper():
                                            username=self.username,
                                            password=self.username)
         except:
-            print('Error: sftp connection to {0} failed'.format(self.host))
-            print('You may need to add the host keys for your XPS to your')
+            print('SFTP Error: SFTP connection to {0} failed'.format(self.host))
+            print('May need to add the host keys for the XPS to the')
             print('ssh known_hosts file, using a command like this:')
             print(' ssh-keyscan {0} >> ~/.ssh/known_hosts'.format(self.host))
-            return False
-        else:
-            return True
+            raise
 
     def close(self):
         if self._conn is not None:
@@ -36,28 +34,28 @@ class SFTPWrapper():
     def cwd(self, remotedir):
         try:
             self._conn.cwd(remotedir)
-        except:
-            print('Error: Could not change to directory {0}'.format(remotedir))
-            return False
-        else:
-            return True
+        except IOError:
+            print('Error: Could not find path')
+            raise
 
     def save(self, remotefile, localfile):
         "Save a remote file to a local file"
         try:
             self._conn.get(remotepath=remotefile, localpath=localfile)
-        except:
-            print('Error: Could not get file {0} to {1}'.format(remotefile, localfile))
-            return False
-        else:
-            return True
+        except IOError:
+            print('Error: Could not save file')
+            raise
 
     def put(self, localfile, remotefile):
         try:
             self._conn.put(localpath=localfile, remotepath=remotefile)
-        except:
-            print('Error: Could not put file {0} to {1}'.format(localfile, remotefile))
-            return False
+        except IOError:
+            print('SFTP Error: Remote path does not exist')
+            raise
+        except OSError:
+            print('SFTP Error: Local file does not exist')
+            raise
+
         else:
             return True
 
@@ -67,8 +65,8 @@ class SFTPWrapper():
         try:
             self._conn.getfo(remotefile, tmp)
         except:
-            print('Error: Could not read {0}'.format(remotefile))
-            return None
+            print('SFTP Error: Could not read remotefile')
+            raise
         else:
             tmp.seek(0)
             text = bytes2str(tmp.read())
