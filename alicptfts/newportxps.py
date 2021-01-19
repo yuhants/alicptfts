@@ -56,40 +56,41 @@ class NewportXPS:
         except Exception:
             raise
 
-    def connect(self):
+    def connect(self, new_socket=True):
         """Connect to the XPS and read system.ini"""
         # Establish connection with XPS
-        op = self._xps.OpenInstrument(self.host,
-                                      self.port,
-                                      self.timeout)
-        try:
-            self.check_error(op, 'Error: could not open XPS')
-        except XPSException:
-            raise
-        else:
-            print('Open {0} : {1}'.format(self.host, self.port))
+        if new_socket:
+            op = self._xps.OpenInstrument(self.host,
+                                        self.port,
+                                        self.timeout)
+            try:
+                self.check_error(op, 'Error: Could not open XPS')
+            except XPSException:
+                raise
+            else:
+                print('Open {0} : {1}'.format(self.host, self.port))
 
-        log, err_log = self._xps.Login(self.username, self.password, str())
-        try:
-            self.check_error(log, err_log)
-        except XPSException:
-            raise
+            log, err_log = self._xps.Login(self.username, self.password, '')
+            try:
+                self.check_error(log, err_log)
+            except XPSException:
+                raise
 
-        res, ver, err_firmware = self._xps.FirmwareVersionGet(str(), str())
-                                           # TODO: or InstallerVersionGet?
-        try:
-            self.check_error(res, err_firmware)
-        except XPSException:
-            raise
+            res, ver, err_firmware = self._xps.FirmwareVersionGet('', '')
+                                            # TODO: or InstallerVersionGet?
+            try:
+                self.check_error(res, err_firmware)
+            except XPSException:
+                raise
 
-        self.firmware_ver = ver
+            self.firmware_ver = ver
         
         # Read group info from system.ini through SFTP
         self.ftpconn = SFTPWrapper()
         try:
             self.read_systemini()
         except Exception:
-            print('Error: could not read system.ini')
+            print('Error: Could not read system.ini')
             raise
             
     def read_systemini(self):
@@ -99,7 +100,7 @@ class NewportXPS:
         """
         try:
             self.ftpconn.connect(**self.ftpargs)
-        except:
+        except Exception:
             raise
         try:
             self.ftpconn.cwd(os.path.join(self.ftphome, 'Config'))
@@ -107,7 +108,7 @@ class NewportXPS:
             raise
         try:
             lines = self.ftpconn.getlines('system.ini')
-        except:
+        except Exception:
             raise
         self.ftpconn.close()
 
@@ -115,7 +116,7 @@ class NewportXPS:
         conf = ConfigParser()
         try:
             conf.read_string('\n'.join(lines))
-        except:
+        except Exception:
             print('Error: Could not parse lines from system.ini')
             raise
 
@@ -141,8 +142,8 @@ class NewportXPS:
         
         for sname in self.stages:
             r_vel_acc, vel, acc, err_vel_acc = self._xps.PositionerMaximumVelocityAndAccelerationGet(sname, 
-                                                                                                     float(), float(),
-                                                                                                     str())
+                                                                                                     0, 0,
+                                                                                                     '')
             try:
                 self.check_error(r_vel_acc, err_vel_acc)
             except XPSException:
@@ -151,23 +152,23 @@ class NewportXPS:
             try:
                 self.stages[sname]['max_velocity']  = vel
                 self.stages[sname]['max_acceleration'] = acc
-            except:
+            except Exception:
                 print('Error: Could not set max velocity/accleration for {0}'.format(sname))
                 raise
 
             ## Travel limits can be set by PositionerUserTravelLimitsSet
             r_lim, min_target, max_target, err_lim = self._xps.PositionerUserTravelLimitsGet(sname,
-                                                                                             float(), float(),
-                                                                                             str())
+                                                                                             0, 0,
+                                                                                             '')
             try:
                 self.check_error(r_lim, err_lim)
-            except:
+            except Exception:
                 raise
 
             try:
                 self.stages[sname]['min_target'] = min_target
                 self.stages[sname]['max_target'] = max_target
-            except:
+            except Exception:
                 print('Error: Could not set travel limit for {0}'.format(sname))
                 raise
 
@@ -181,14 +182,14 @@ class NewportXPS:
             try:
                 self.kill_group(group=g)
             except Exception:
-                print('Error: could not kill group {0} during initialization'.format(g))
+                print('Error: Could not kill group {0} during initialization'.format(g))
                 raise
 
         for g in self.groups:
             try:
                 self.initialize_group(group=g, with_encoder=True, homing=True)
             except Exception:
-                print('Error: could not initialize group {0}'.format(g))
+                print('Error: Could not initialize group {0}'.format(g))
                 raise
 
     def configure_pointing(self, positions, relative):
@@ -234,8 +235,7 @@ class NewportXPS:
         """
         try:
             positioner = self.get_positioner('MovingLinear')    # group and axis in string
-        except:
-            print('Error: Invalid group/positioner name')
+        except Exception:
             raise
 
         # Get the reference points (plus and minus ends)
@@ -263,7 +263,7 @@ class NewportXPS:
         if status != 11:
             try:
                 self.home_group('MovingLinear')
-            except:
+            except Exception:
                 raise
         try:
             origin = self.get_setpoint_position('MovingLinear', 1)[0]
@@ -276,7 +276,7 @@ class NewportXPS:
         res_confg, err_confg = self._xps.GatheringConfigurationSet(positioner+'.CurrentPosition', 
                                                                    positioner+'.CurrentVelocity',
                                                                    positioner+'.CurrentAcceleration',
-                                                                   str())
+                                                                   '')
         try:
             self.check_error(res_confg, err_confg)
         except XPSException:
@@ -284,7 +284,7 @@ class NewportXPS:
 
         timestamps[0] = time.time()                             # First timestamp
                                                                 # beginning of the scan
-        res_run, err_run = self._xps.GatheringRun(gathering_params[0], gathering_params[1], str())
+        res_run, err_run = self._xps.GatheringRun(gathering_params[0], gathering_params[1], '')
                                                   # num of data sets & time interval in servo cycles
                                                   # TODO: find the right/appropriate numbers
         try:
@@ -294,8 +294,8 @@ class NewportXPS:
         
         try:
             moving_linear = self.get_group('MovingLinear')              # Get group for later use
-        except:
-            print('Error: Could not get the group of the MovingLinear stage')
+        except Exception:
+            print('Error: Could not get group for the MovingLinear stage')
             raise
         try:
             self.move_group(moving_linear, plus, 1, False, False)       # Move to the plus end
@@ -342,7 +342,7 @@ class NewportXPS:
         if not get_group:
             try:
                 group = self.get_group(grp_name)
-            except:
+            except Exception:
                 raise
         else:
             group = grp_name
@@ -355,7 +355,7 @@ class NewportXPS:
         except AttributeError:
             raise
 
-        res, err = move(group, [value], nb_item, str())
+        res, err = move(group, [value], nb_item, '')
         try:
             self.check_error(res, err)
         except XPSException:
@@ -364,14 +364,10 @@ class NewportXPS:
     def get_setpoint_position(self, grp_name, nb_item):
         try:
             group = self.get_group(grp_name)
-        except:
+        except Exception:
             raise
 
-        res, pos, err = self._xps.GroupPositionSetpointGet(group,
-                                    [0.0],
-                                    # [0.0 for i in range(nb_item)], # TODO
-                                                                     # Change to this if not working
-                                    nb_item, str())
+        res, pos, err = self._xps.GroupPositionSetpointGet(group, [0.0], nb_item, '')
         try:
             self.check_error(res, err)
         except XPSException:
@@ -383,7 +379,7 @@ class NewportXPS:
             exec_method = getattr(self._xps, method)
         except AttributeError:
             raise
-        res, err = exec_method(group, str())
+        res, err = exec_method(group, '')
         try:
             self.check_error(res, err)
         except XPSException:
@@ -392,19 +388,19 @@ class NewportXPS:
     def kill_group(self, grp_name):
         try:
             group = self.get_group(grp_name)
-        except:
+        except Exception:
             raise
 
         method = 'GroupKill'
         try:
             self._group_action(method=method, group=group)
-        except:
+        except Exception:
             raise
 
     def initialize_group(self, grp_name, with_encoder=True, homing=True):
         try:
             group = self.get_group(grp_name)
-        except:
+        except Exception:
             raise
 
         method = 'GroupInitialize'
@@ -412,25 +408,25 @@ class NewportXPS:
             method = 'GroupInitializeWithEncoderCalibration'
         try:
             self._group_action(method=method, group=group)
-        except:
+        except Exception:
             raise
 
         if homing:
             try:
                 self.home_group(group=group)
-            except:
+            except Exception:
                 raise
 
     def home_group(self, grp_name):
         try:
             group = self.get_group(grp_name)
-        except:
+        except Exception:
             raise
 
         method = 'GroupHomeSearch'
         try:
             self._group_action(method=method, group=group)
-        except:
+        except Exception:
             raise
 
     def get_group_status(self, grp_name):
@@ -439,7 +435,7 @@ class NewportXPS:
         except Exception:
             raise
 
-        res, status, err_status = self._xps.GroupStatusGet(group, 0, str())
+        res, status, err_status = self._xps.GroupStatusGet(group, 0, '')
         try:
             self.check_error(res, err_status)
         except XPSException:
@@ -456,7 +452,7 @@ class NewportXPS:
         """Save remote file to the current path"""
         try:
             self.ftpconn.connect(**self.ftpargs)
-        except:
+        except Exception:
             raise
         try:
             self.ftpconn.cwd(os.path.join(self.ftphome, rm_path))
@@ -473,15 +469,15 @@ class NewportXPS:
         """Upload file to the remote path"""
         try:
             self.ftpconn.connect(**self.ftpargs)
-        except:
+        except Exception:
             raise
         try:
             self.ftpconn.cwd(os.path.join(self.ftphome, rm_path))
-        except:
+        except Exception:
             raise
         try:
             self.ftpconn.put(rm_fname, fname)
-        except:
+        except Exception:
             raise
 
         self.ftpconn.close()
@@ -489,49 +485,98 @@ class NewportXPS:
     def save_systemini(self):
         try:
             self.save_file('Config', 'system.ini', 'system.ini')
-        except:
+        except Exception:
             raise
 
     def save_stagesini(self):
         try:
             self.save_file('Config', 'stages.ini', 'stages.ini')
-        except:
+        except Exception:
             raise
 
     def save_gathering(self, fname):
         try:
             self.save_file('Public', 'GATHERING.DAT', fname)
-        except:
+        except Exception:
             raise
 
     def upload_systemini(self):
         try:
             self.upload_file('Config', 'system.ini', 'system.ini')
-        except:
+        except Exception:
             raise
 
     def upload_stagesini(self):
         try:
             self.upload_file('Config', 'stages.ini', 'stages.ini')
-        except:
+        except Exception:
             raise
 
-    ## TODO
-    def set_scan_params(self, scan_params):
-        # Set scan params if doesn't match with current values
-        if scan_params is None:
-            pass
-        pass
+    def get_motion_params(self, positioner):
+        """Get the SGamma profile parameters of the positioner"""
+        try:
+            positioner_name = get_positioner(positioner)
+        except Exception:
+            raise
+        try:
+            res, vel, acc, min_jerk, max_jerk, err = self._xps.PositionerSGammaParametersGet(positioner_name, 0.0, 0.0, 0.0, 0.0, '')
+        except Exception:
+            raise
+        try:
+            self.check_error(res, err)
+        except XPSException:
+            raise
+        
+        return [vel, acc, min_jerk, max_jerk]
+
+    def set_motion_params(self, positioner, motion_params):
+        """Set motion parameters for the SGamma profile"""
+        if motion_params is None:
+            return  # Use default values (in stage.ini)
+                    # or values set by a previous operation
+        try:
+            try:
+                default_values = self.get_motion_params(positioner)
+            except Exception:
+                raise
+
+            for i in len(motion_params):
+                if motion_params[i] is None:    # Set to default values if None
+                    motion_params[i] = default_values[i]
+            vel, acc, min_jerk, max_jerk = motion_params[0], motion_params[1], motion_params[2], motion_params[3]
+        except Exception:
+            print('Error: Could not set the motion parameters')
+            raise
+        try:
+            positioner_name = get_positioner(positioner)
+        except Exception:
+            raise
+        res, err = self._xps.PositionerSGammaParametersSet(positioner_name,
+                                                           vel, acc,
+                                                           min_jerk, max_jerk, '')
+        try:
+            self.check_error(res, err)
+        except XPSException:
+            raise
 
     def get_group(self, grp_name):
-        # print('Error: Invalid group name')
+        # TODO
+        # This function should return the group names correspond to
+        # the following inputs: "PointingLinear", "PointingRotary",
+        # and "Moving Linear". The returned name could be used to
+        # Call XPS functions
         pass
 
     def get_positioner(self, grp_name):
+        # TODO
+        # This function should return GroupName.PositionerName that
+        # correspond to the following inputs: "PointingLinear", 
+        # "PointingRotary", and "Moving Linear". The returned name 
+        # could be used to call XPS functions
         pass
 
     def stop_all(self):
-        """Abort any ongoing motions"""
+        """Abort any ongoing motions of the groups"""
         for g in self.groups:
             try:
                 self.stop_group(g)
@@ -539,6 +584,7 @@ class NewportXPS:
                 raise
 
     def pause_all(self):
+        """Pause the system by disabling all groups"""
         for g in self.groups:
             try:
                 self.disable_group(g)
@@ -546,6 +592,7 @@ class NewportXPS:
                 raise
 
     def resume_all(self):
+        """Resume the system and enable group actions"""
         for g in self.groups:
             try:
                 self.enable_group(g)
@@ -558,7 +605,7 @@ class NewportXPS:
         except AttributeError:
             raise
 
-        res, err = exec_method(group, str())
+        res, err = exec_method(group, '')
         if res == -22:
             print(msg)
             return
@@ -571,11 +618,11 @@ class NewportXPS:
     def stop_group(self, grp_name):
         try:
             group = self.get_group(grp_name)
-        except:
+        except Exception:
             raise
         
         # Message for null result (doing nothing; not raising an exception)
-        msg = 'Not aborting {0}: Group status not MOVING or JOGGING'.format(group)
+        msg = 'Not aborting {0}: Group status is not MOVING or JOGGING'.format(group)
         try:
             self._group_motion_state('GroupMoveAbort', group, msg)
         except Exception:
@@ -584,10 +631,10 @@ class NewportXPS:
     def disable_group(self):
         try:
             group = self.get_group(grp_name)
-        except:
+        except Exception:
             raise
         
-        msg = 'Not disabling {0}: Group status not READY'.format(group)
+        msg = 'Not disabling {0}: Group status is not READY'.format(group)
         try:
             self._group_motion_state('GroupMotionDisable', group, msg)
         except Exception:
@@ -596,16 +643,46 @@ class NewportXPS:
     def enable_group(self):
         try:
             group = self.get_group(grp_name)
-        except:
+        except Exception:
             raise
         
-        msg = 'Not enabling {0}: Group status not DISABLE'.format(group)
+        msg = 'Not enabling {0}: Group status is not DISABLE'.format(group)
         try:
             self._group_motion_state('GroupMotionEnable', group, msg)
         except Exception:
             raise
 
+    def reboot(self, reconnect=True):
+        """Reboot the XPS controller
+        
+        Can be used when applying changes in sytem.ini or stages.ini
+        """
+        self.ftpconn.close()
+        res_close, err_close = self._xps.CloseAllOtherSockets('')
+        try:
+            self.check_error(res_close, err_close)
+        except XPSException:
+            raise
+
+        res_reboot, err_reboot = self._xps.Reboot('')
+        try:
+            self.check_error(res_reboot, err_reboot)
+        except XPSException:
+            raise
+
+        if reconnect:
+            try:
+                self.connect(new_socket=False)
+            except Exception:
+                raise
+
+    def close(self):
+        res = self._xps.CloseInstrument()
+        if res != 0:
+            raise XPSException('Error: Could not close the socket')
+
     def status(self):
+        # TODO
         pass
 
 if __name__ == '__main__':
